@@ -1,0 +1,47 @@
+.fretboard-container {
+  width: 100%;
+}
+
+.fretboard-wrapper {
+  width: 100%;
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 12px;
+  border: 2px solid #dee2e6;
+}
+
+.fretboard-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.clickable {
+  cursor: pointer;
+
+  &:hover {
+    opacity: 0.8;
+  }
+}
+
+.empty-dot:hover {
+  fill: #e9ecef !important;
+  stroke: #adb5bd;
+  stroke-width: 1;
+}
+
+.note-dot {
+  transition: all 0.15s ease;
+}
+
+.string-label-text {
+  user-select: none;
+}
+
+.string-marker {
+  cursor: pointer;
+
+  &:hover {
+    opacity: 0.7;
+  }
+}

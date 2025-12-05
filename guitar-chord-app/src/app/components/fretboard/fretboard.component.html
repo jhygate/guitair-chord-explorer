@@ -1,0 +1,187 @@
+<div class="fretboard-container">
+  <!-- Controls -->
+  <div class="flex items-center justify-between mb-3">
+    <div class="text-sm font-medium text-gray-700">
+      Position: {{ getPositionLabel() }}
+    </div>
+    <div class="flex gap-2">
+      <button
+        (click)="moveUp()"
+        [disabled]="fretStart === 0"
+        class="px-2 py-1 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 rounded text-xs font-medium">
+        ← Lower
+      </button>
+      <button
+        (click)="moveDown()"
+        [disabled]="fretEnd >= 24"
+        class="px-2 py-1 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 rounded text-xs font-medium">
+        Higher →
+      </button>
+    </div>
+  </div>
+
+  <!-- Fretboard (Horizontal) -->
+  <div class="fretboard-wrapper">
+    <!-- The actual fretboard -->
+    <svg class="fretboard-svg" [attr.viewBox]="getViewBox()" preserveAspectRatio="xMinYMid meet">
+      <!-- Background -->
+      <rect x="0" y="0" [attr.width]="getViewBoxWidth()" height="180" fill="#8B4513" opacity="0.3"/>
+
+      <!-- Fret lines (vertical) -->
+      @for (fret of frets; track fret; let i = $index) {
+        <line [attr.x1]="80 + (i * 80)"
+              [attr.y1]="20"
+              [attr.x2]="80 + (i * 80)"
+              [attr.y2]="160"
+              stroke="#666"
+              stroke-width="2"/>
+      }
+
+      <!-- End fret line -->
+      <line [attr.x1]="80 + (frets.length * 80)"
+            y1="20"
+            [attr.x2]="80 + (frets.length * 80)"
+            y2="160"
+            stroke="#666"
+            stroke-width="3"/>
+
+      <!-- Nut (if showing open position) -->
+      @if (fretStart === 0) {
+        <line x1="80"
+              y1="20"
+              x2="80"
+              y2="160"
+              stroke="#333"
+              stroke-width="4"/>
+      }
+
+      <!-- String lines (horizontal) -->
+      @for (stringData of strings; track stringData.string; let i = $index) {
+        <g>
+          <line [attr.x1]="80"
+                [attr.y1]="30 + (i * 25)"
+                [attr.x2]="80 + (frets.length * 80)"
+                [attr.y2]="30 + (i * 25)"
+                [attr.stroke]="isStringMuted(stringData.string) ? '#ccc' : '#333'"
+                [attr.stroke-width]="1 + (6 - i) * 0.3"
+                [attr.opacity]="isStringMuted(stringData.string) ? '0.3' : '1'"/>
+
+          <!-- Mute/Play marker (X or O) on far left -->
+          <g class="string-marker">
+            <!-- Invisible clickable hitbox -->
+            <rect [attr.x]="0"
+                  [attr.y]="18 + (i * 25)"
+                  width="30"
+                  height="24"
+                  fill="transparent"
+                  class="clickable"
+                  (click)="onStringDoubleClick(stringData.string)"/>
+
+            <!-- X for muted -->
+            @if (isStringMuted(stringData.string)) {
+              <text [attr.x]="15"
+                    [attr.y]="35 + (i * 25)"
+                    text-anchor="middle"
+                    font-size="16"
+                    fill="#dc3545"
+                    font-weight="bold"
+                    pointer-events="none">
+                ✕
+              </text>
+            }
+            <!-- O for open/played -->
+            @if (!isStringMuted(stringData.string)) {
+              <circle [attr.cx]="15"
+                      [attr.cy]="30 + (i * 25)"
+                      r="8"
+                      fill="none"
+                      stroke="#28a745"
+                      stroke-width="2"
+                      pointer-events="none"/>
+            }
+          </g>
+
+          <!-- String note name label -->
+          <text [attr.x]="50"
+                [attr.y]="35 + (i * 25)"
+                text-anchor="middle"
+                font-size="12"
+                [attr.fill]="isStringMuted(stringData.string) ? '#999' : '#333'"
+                font-weight="600"
+                class="string-label-text">
+            {{ getStringNoteName(stringData.string) }}
+          </text>
+        </g>
+      }
+
+      <!-- Fret numbers -->
+      @for (fret of frets; track fret; let i = $index) {
+        <text [attr.x]="120 + (i * 80)"
+              y="15"
+              text-anchor="middle"
+              font-size="10"
+              fill="#666">
+          {{ fretStart + i === 0 ? '' : (fretStart + i) }}
+        </text>
+      }
+
+      <!-- Note dots/circles -->
+      @for (stringData of strings; track stringData.string; let stringIdx = $index) {
+        <g>
+          @for (position of stringData.positions; track position.fret; let fretIdx = $index) {
+            <g>
+              <!-- Ghost notes (unselected chord tones) -->
+              @if (!isPositionSelected(position) && position.isInChord && !isStringMuted(stringData.string)) {
+                <circle [attr.cx]="120 + (fretIdx * 80)"
+                        [attr.cy]="30 + (stringIdx * 25)"
+                        r="8"
+                        [attr.fill]="position.isRoot ? '#ffc107' : '#90caf9'"
+                        [attr.opacity]="0.4"
+                        stroke="none"
+                        class="note-dot clickable"
+                        (click)="onPositionClick(position)"/>
+              }
+
+              <!-- Selected notes -->
+              @if (isPositionSelected(position) && !isStringMuted(stringData.string)) {
+                <g (click)="onPositionClick(position)" class="clickable">
+                  <circle [attr.cx]="120 + (fretIdx * 80)"
+                          [attr.cy]="30 + (stringIdx * 25)"
+                          r="10"
+                          [attr.fill]="position.isInChord ? '#2196f3' : '#f44336'"
+                          stroke="#fff"
+                          stroke-width="2"/>
+                  <text [attr.x]="120 + (fretIdx * 80)"
+                        [attr.y]="34 + (stringIdx * 25)"
+                        text-anchor="middle"
+                        font-size="9"
+                        fill="#fff"
+                        font-weight="bold"
+                        pointer-events="none">
+                    {{ getNoteDisplay(position) }}
+                  </text>
+                </g>
+              }
+
+              <!-- Clickable areas for empty positions -->
+              @if (!isPositionSelected(position) && !position.isInChord && !isStringMuted(stringData.string)) {
+                <circle [attr.cx]="120 + (fretIdx * 80)"
+                        [attr.cy]="30 + (stringIdx * 25)"
+                        r="8"
+                        fill="transparent"
+                        stroke="none"
+                        class="note-dot clickable empty-dot"
+                        (click)="onPositionClick(position)"/>
+              }
+            </g>
+          }
+        </g>
+      }
+    </svg>
+  </div>
+
+  <!-- Instructions -->
+  <div class="mt-2 text-xs text-gray-500">
+    <p>Click position to select • Click X/O to mute/unmute string</p>
+  </div>
+</div>

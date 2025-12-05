@@ -1,0 +1,12 @@
+.chord-identifier {
+  width: 100%;
+}
+
+.chord-match {
+  background: #ffffff;
+
+  &:hover {
+    background: #f9fafb;
+    border-color: #3b82f6;
+  }
+}

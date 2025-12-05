@@ -1,0 +1,15 @@
+<div class="sheet-music-container">
+  @if (chordName) {
+    <h3 class="text-sm font-semibold text-gray-800 mb-3">{{ chordName }}</h3>
+  }
+
+  <div class="sheet-music-wrapper">
+    <div #sheetMusicContainer class="sheet-music-canvas"></div>
+
+    @if (selectedPositions.length === 0) {
+      <div class="text-center text-gray-400 text-sm py-8">
+        Select notes on the fretboard to see sheet music
+      </div>
+    }
+  </div>
+</div>

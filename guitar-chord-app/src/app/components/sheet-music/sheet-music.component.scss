@@ -1,0 +1,22 @@
+.sheet-music-container {
+  width: 100%;
+  max-width: 400px;
+}
+
+.sheet-music-wrapper {
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 16px;
+  border: 2px solid #dee2e6;
+  min-height: 280px;
+}
+
+.sheet-music-canvas {
+  width: 100%;
+  overflow-x: auto;
+
+  svg {
+    display: block;
+    margin: 0 auto;
+  }
+}

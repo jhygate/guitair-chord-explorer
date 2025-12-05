@@ -1,0 +1,189 @@
+<div class="min-h-screen bg-gray-50">
+  <header class="bg-white shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 py-4">
+      <div class="flex items-center justify-between">
+        <h1 class="text-2xl font-bold text-gray-900">Guitar Chord Explorer</h1>
+
+        <!-- Mode Toggle -->
+        <div class="flex gap-2">
+          <button
+            (click)="setMode('explorer')"
+            [class]="appMode === 'explorer' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'"
+            class="px-4 py-2 rounded-md text-sm font-medium transition-colors hover:opacity-90">
+            Scale Explorer
+          </button>
+          <button
+            (click)="setMode('builder')"
+            [class]="appMode === 'builder' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'"
+            class="px-4 py-2 rounded-md text-sm font-medium transition-colors hover:opacity-90">
+            Chord Builder
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-6">
+    <!-- SCALE EXPLORER MODE -->
+    @if (appMode === 'explorer') {
+      <!-- Scale Selector -->
+      <div class="bg-white rounded-lg shadow p-6 mb-6">
+      <h2 class="text-lg font-semibold text-gray-800 mb-4">Scale Selection</h2>
+      <div class="flex gap-4">
+        <!-- Root Note Selector -->
+        <div class="flex-1">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Root Note</label>
+          <select
+            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            (change)="onRootChange($any($event.target).selectedIndex)">
+            @for (note of rootNotes; track note.pitch; let i = $index) {
+              <option [value]="i">
+                {{ note.pitch }}{{ note.accidental }}
+              </option>
+            }
+          </select>
+        </div>
+
+        <!-- Scale Type Selector -->
+        <div class="flex-1">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Scale Type</label>
+          <select
+            class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            [(ngModel)]="selectedScaleType"
+            (change)="updateScale()">
+            @for (type of scaleTypes; track type.value) {
+              <option [value]="type.value">
+                {{ type.label }}
+              </option>
+            }
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chords in Scale -->
+    @if (currentScale) {
+      <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">
+          Chords in {{ currentScale.root.pitch }}{{ currentScale.root.accidental }}
+          {{ getScaleTypeLabel(currentScale.type) }}
+        </h2>
+
+        <!-- Triads -->
+        <div class="mb-6">
+          <h3 class="text-sm font-medium text-gray-600 mb-3">Triads</h3>
+          <div class="flex flex-wrap gap-2">
+            @for (chord of currentScale.chords.slice(0, 7); track chord.displayName) {
+              <button
+                (click)="onChordClick(chord)"
+                [class.ring-2]="selectedChord === chord"
+                [class.ring-blue-500]="selectedChord === chord"
+                class="px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-800 rounded-md transition-colors">
+                {{ chord.displayName }} <span class="text-xs text-blue-600">({{ chord.romanNumeral }})</span>
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- 7th Chords -->
+        <div>
+          <h3 class="text-sm font-medium text-gray-600 mb-3">7th Chords</h3>
+          <div class="flex flex-wrap gap-2">
+            @for (chord of currentScale.chords.slice(7); track chord.displayName) {
+              <button
+                (click)="onChordClick(chord)"
+                [class.ring-2]="selectedChord === chord"
+                [class.ring-purple-500]="selectedChord === chord"
+                class="px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-800 rounded-md transition-colors">
+                {{ chord.displayName }} <span class="text-xs text-purple-600">({{ chord.romanNumeral }})</span>
+              </button>
+            }
+          </div>
+        </div>
+
+        <!-- Debug: Scale Notes -->
+        <div class="mt-6 pt-6 border-t border-gray-200">
+          <h3 class="text-sm font-medium text-gray-600 mb-2">Scale Notes</h3>
+          <p class="text-gray-700">
+            @for (note of currentScale.notes; track $index; let last = $last) {
+              <span>
+                {{ note.pitch }}{{ note.accidental }}@if (!last) {<span>, </span>}
+              </span>
+            }
+          </p>
+        </div>
+      </div>
+    }
+
+    <!-- Chord Diagram: Fretboard + Sheet Music -->
+    @if (selectedChord) {
+      <div class="bg-white rounded-lg shadow p-6 mt-6">
+        <div class="flex items-center justify-between mb-4">
+          <h2 class="text-lg font-semibold text-gray-800">
+            {{ selectedChord.displayName }}
+          </h2>
+          <button
+            (click)="toggleSheetMusic()"
+            class="px-3 py-1 text-sm bg-gray-200 hover:bg-gray-300 rounded-md transition-colors">
+            {{ showSheetMusic ? 'Hide' : 'Show' }} Sheet Music
+          </button>
+        </div>
+
+        <div class="flex flex-col lg:flex-row gap-6">
+          <!-- Fretboard -->
+          <div [class]="showSheetMusic ? 'flex-1' : 'w-full'">
+            <h3 class="text-sm font-medium text-gray-600 mb-3">Fretboard</h3>
+            <app-fretboard
+              [chord]="selectedChord"
+              [expandedView]="!showSheetMusic"
+              (selectionChange)="onFretboardSelectionChange($event)">
+            </app-fretboard>
+          </div>
+
+          <!-- Sheet Music -->
+          @if (showSheetMusic) {
+            <div class="flex-1">
+              <h3 class="text-sm font-medium text-gray-600 mb-3">Sheet Music</h3>
+              <app-sheet-music
+                [selectedPositions]="selectedFretboardPositions"
+                [chordName]="selectedChord.displayName">
+              </app-sheet-music>
+            </div>
+          }
+        </div>
+      </div>
+    } @else {
+      <!-- CHORD BUILDER MODE -->
+      <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-lg font-semibold text-gray-800 mb-4">
+          Chord Builder
+        </h2>
+        <p class="text-sm text-gray-600 mb-6">
+          Click notes on the fretboard to build a chord. We'll identify what chord you're playing and show you which keys it appears in.
+        </p>
+
+        <div class="flex flex-col lg:flex-row gap-6">
+          <!-- Fretboard -->
+          <div class="flex-1">
+            <h3 class="text-sm font-medium text-gray-600 mb-3">Fretboard</h3>
+            <app-fretboard
+              [chord]="null"
+              [expandedView]="true"
+              (selectionChange)="onBuilderSelectionChange($event)">
+            </app-fretboard>
+          </div>
+
+          <!-- Chord Identifier -->
+          <div class="flex-1">
+            <h3 class="text-sm font-medium text-gray-600 mb-3">Identified Chords</h3>
+            <div class="bg-gray-50 rounded-lg p-4 min-h-[400px]">
+              <app-chord-identifier
+                [selectedPositions]="builderSelectedPositions">
+              </app-chord-identifier>
+            </div>
+          </div>
+        </div>
+      </div>
+    }
+  </main>
+</div>
