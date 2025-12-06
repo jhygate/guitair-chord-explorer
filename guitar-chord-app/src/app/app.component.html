@@ -152,6 +152,7 @@
             <div class="w-full">
               <div class="flex items-center justify-between mb-3">
                 <h3 class="text-sm font-medium text-gray-600">Piano</h3>
+                <app-playback-controls [positions]="selectedFretboardPositions"></app-playback-controls>
               </div>
               <app-piano-keyboard
                 [selectedPositions]="selectedFretboardPositions">
@@ -209,29 +210,54 @@
           </div>
         </div>
 
-        <div class="flex flex-col lg:flex-row gap-6">
-          <!-- Fretboard -->
-          <div class="flex-1">
-            <h3 class="text-sm font-medium text-gray-600 mb-3">Fretboard</h3>
+        <div class="flex flex-col gap-6">
+          <!-- Fretboard (Builder Mode) -->
+          <div class="w-full">
             <app-fretboard
-              [chord]="selectedBuilderChord"
               [scale]="builderScale"
+              [selectedPositions]="builderSelectedPositions"
+              [chord]="selectedBuilderChord"
+              [showScaleDegrees]="true"
               [expandedView]="true"
               (selectionChange)="onBuilderSelectionChange($event)">
             </app-fretboard>
           </div>
 
-          <!-- Chord Identifier -->
-          <div class="flex-1">
-            <h3 class="text-sm font-medium text-gray-600 mb-3">Identified Chords</h3>
-            <div class="bg-gray-50 rounded-lg p-4 min-h-[400px]">
+          <!-- Chord Identifier & Piano (Stacked) -->
+          <div class="flex flex-col gap-6 w-full">
+            <!-- Chord Identifier -->
+            <div class="w-full">
               <app-chord-identifier
                 [selectedPositions]="builderSelectedPositions"
                 (chordSelected)="onBuilderChordSelected($event)">
               </app-chord-identifier>
             </div>
+
+            <!-- Piano Keyboard -->
+            <div class="w-full">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-medium text-gray-600">Piano</h3>
+                <app-playback-controls [positions]="builderSelectedPositions"></app-playback-controls>
+              </div>
+              <app-piano-keyboard
+                [selectedPositions]="builderSelectedPositions">
+              </app-piano-keyboard>
+            </div>
           </div>
         </div>
+
+        <!-- Sheet Music (if chord selected) -->
+          @if (selectedBuilderChord) {
+            <div class="w-full">
+              <h3 class="text-sm font-medium text-gray-600 mb-3">Sheet Music</h3>
+              <div class="bg-white rounded-lg p-4 border border-gray-200">
+                <app-sheet-music
+                  [selectedPositions]="selectedBuilderChordPositions"
+                  [chordName]="selectedBuilderChord.displayName">
+                </app-sheet-music>
+              </div>
+            </div>
+          }
       </div>
     }
   </main>

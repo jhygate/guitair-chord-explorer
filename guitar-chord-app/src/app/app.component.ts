@@ -1,7 +1,6 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { FormsModule } from '@angular/forms';
 import { MusicTheoryService } from './services/music-theory.service';
 import { FretboardService } from './services/fretboard.service';
 import { Note, Scale, ScaleType, SCALE_TYPE_LABELS, Chord, FretboardPosition } from './models';
@@ -10,13 +9,14 @@ import { FretboardComponent } from './components/fretboard/fretboard.component';
 import { SheetMusicComponent } from './components/sheet-music/sheet-music.component';
 import { PianoKeyboardComponent } from './components/piano-keyboard/piano-keyboard.component';
 import { ChordIdentifierComponent } from './components/chord-identifier/chord-identifier.component';
+import { PlaybackControlsComponent } from './components/playback-controls/playback-controls.component';
 
 type AppMode = 'explorer' | 'builder';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule, FretboardComponent, SheetMusicComponent, PianoKeyboardComponent, ChordIdentifierComponent],
+  imports: [CommonModule, FormsModule, FretboardComponent, SheetMusicComponent, PianoKeyboardComponent, ChordIdentifierComponent, PlaybackControlsComponent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })

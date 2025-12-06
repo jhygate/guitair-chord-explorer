@@ -1,0 +1,8 @@
+<div class="playback-controls">
+  <button (click)="playChord()" [disabled]="positions.length === 0" class="play-btn" title="Play Chord">
+    <span class="icon">♪</span> Play Chord
+  </button>
+  <button (click)="playArpeggio()" [disabled]="positions.length === 0" class="play-btn" title="Play Arpeggio">
+    <span class="icon">♬</span> Play Arpeggio
+  </button>
+</div>

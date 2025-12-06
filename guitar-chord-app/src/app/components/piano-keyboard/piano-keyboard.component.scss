@@ -51,16 +51,14 @@
 
 .piano-keyboard {
     display: block;
-    /* Changed from flex to block to allow inline-block children */
     position: relative;
     height: 120px;
     background: #2c3e50;
     border-radius: 4px;
     padding: 8px;
     white-space: nowrap;
-    /* Prevent wrapping */
-    min-width: min-content;
-    /* Ensure container grows with content */
+    width: 856px; // 21 keys * 40px + 16px padding
+    box-sizing: border-box;
 }
 
 .piano-key {
@@ -71,15 +69,13 @@
 }
 
 .white-key {
-    display: inline-block;
+    position: absolute; // Changed from inline-block to absolute
+    top: 8px; // Match padding
     width: 40px;
-    /* Fixed width */
-    height: 100%;
+    height: 104px; // 120px - 16px padding
     background: white;
     border: 1px solid #333;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    margin-right: -1px;
-    /* Remove gap between inline-block elements */
 
     &.selected {
         background: #3498db;
