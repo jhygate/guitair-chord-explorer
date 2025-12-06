@@ -1,6 +1,6 @@
 import { Component, Input, Output, EventEmitter, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { Chord, FretboardPosition } from '../../models';
+import { Chord, FretboardPosition, Scale } from '../../models';
 import { FretboardService } from '../../services/fretboard.service';
 
 interface StringPosition {
@@ -18,7 +18,9 @@ interface StringPosition {
 })
 export class FretboardComponent implements OnChanges {
   @Input() chord: Chord | null = null;
+  @Input() scale: Scale | null = null;
   @Input() expandedView: boolean = false;
+  @Input() autoSelectChord: boolean = true;
   @Output() selectionChange = new EventEmitter<FretboardPosition[]>();
 
   fretStart = 0;
@@ -26,14 +28,19 @@ export class FretboardComponent implements OnChanges {
   frets: number[] = [];
   strings: StringPosition[] = [];
   selectedPositions: Set<string> = new Set();
-  mutedStrings: Set<number> = new Set();
+  mutedStrings: Set<number> = new Set([1, 2, 3, 4, 5, 6]); // Start with all strings muted
+  showScaleDegrees = true; // Toggle between scale degrees and note names
+  previousChordName: string | null = null; // Track previous chord to detect changes
 
   constructor(private fretboardService: FretboardService) {
     this.updateFretRange();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-    if (changes['chord'] && this.chord) {
+    if (changes['chord']) {
+      this.updateFretboard();
+    }
+    if (changes['scale']) {
       this.updateFretboard();
     }
     if (changes['expandedView']) {
@@ -52,23 +59,94 @@ export class FretboardComponent implements OnChanges {
   }
 
   updateFretboard(): void {
-    if (!this.chord) return;
+    // If we have a chord, show chord-based positions
+    if (this.chord) {
+      // Only clear selections and auto-select if this is a NEW chord (not just fret range change)
+      const isNewChord = this.previousChordName !== this.chord.displayName;
+      
+      if (isNewChord && this.autoSelectChord) {
+        // Clear muted strings and selections when loading a new chord
+        this.mutedStrings.clear();
+        this.selectedPositions.clear();
+      }
+      
+      this.previousChordName = this.chord.displayName;
+      
+      const positions = this.fretboardService.getFretboardPositions(
+        this.chord,
+        this.fretStart,
+        this.fretEnd
+      );
 
-    const positions = this.fretboardService.getFretboardPositions(
-      this.chord,
-      this.fretStart,
-      this.fretEnd
-    );
+      // Group positions by string
+      this.strings = [];
+      for (let stringNum = 1; stringNum <= 6; stringNum++) {
+        const stringPositions = positions.filter(p => p.string === stringNum);
+        this.strings.push({
+          string: stringNum,
+          positions: stringPositions,
+          isMuted: this.mutedStrings.has(stringNum)
+        });
+        
+        // Auto-select the first chord tone on each unmuted string ONLY for new chords AND if auto-select is enabled
+        if (isNewChord && this.autoSelectChord && !this.mutedStrings.has(stringNum)) {
+          const firstChordTone = stringPositions.find(p => p.isInChord);
+          if (firstChordTone) {
+            this.selectedPositions.add(`${stringNum}-${firstChordTone.fret}`);
+          }
+        }
+      }
+      
+      // Emit the selection (only on new chord to set initial state)
+      if (isNewChord && this.autoSelectChord) {
+        this.emitSelectionChange();
+      }
+    } 
+    // If we have a scale (builder mode), show scale-based positions
+    else if (this.scale) {
+      // Don't clear muted strings in builder mode - user controls them
+      
+      const positions = this.fretboardService.getScaleFretboardPositions(
+        this.scale,
+        this.fretStart,
+        this.fretEnd
+      );
 
-    // Group positions by string
-    this.strings = [];
-    for (let stringNum = 1; stringNum <= 6; stringNum++) {
-      const stringPositions = positions.filter(p => p.string === stringNum);
-      this.strings.push({
-        string: stringNum,
-        positions: stringPositions,
-        isMuted: this.mutedStrings.has(stringNum)
-      });
+      // Group positions by string
+      this.strings = [];
+      for (let stringNum = 1; stringNum <= 6; stringNum++) {
+        const stringPositions = positions.filter(p => p.string === stringNum);
+        this.strings.push({
+          string: stringNum,
+          positions: stringPositions,
+          isMuted: this.mutedStrings.has(stringNum)
+        });
+      }
+    }
+    // No chord or scale - show empty fretboard with all positions clickable and ALL STRINGS MUTED
+    else {
+      // Start with all strings muted
+      this.mutedStrings = new Set([1, 2, 3, 4, 5, 6]);
+      
+      this.strings = [];
+      for (let stringNum = 1; stringNum <= 6; stringNum++) {
+        const stringPositions: FretboardPosition[] = [];
+        for (let fret = this.fretStart; fret <= this.fretEnd; fret++) {
+          const note = this.fretboardService.getNoteAtPosition(stringNum, fret);
+          stringPositions.push({
+            string: stringNum,
+            fret,
+            note,
+            isInChord: false,
+            isRoot: false
+          });
+        }
+        this.strings.push({
+          string: stringNum,
+          positions: stringPositions,
+          isMuted: true  // All strings start muted
+        });
+      }
     }
   }
 
@@ -91,32 +169,47 @@ export class FretboardComponent implements OnChanges {
   }
 
   onPositionClick(position: FretboardPosition): void {
-    const key = `${position.string}-${position.fret}`;
-
-    if (this.selectedPositions.has(key)) {
-      this.selectedPositions.delete(key);
-    } else {
-      // Clear other selections on this string
-      for (let fret = 0; fret <= 24; fret++) {
-        this.selectedPositions.delete(`${position.string}-${fret}`);
-      }
-      this.selectedPositions.add(key);
-      // Unmute the string if it was muted
+    const posKey = `${position.string}-${position.fret}`;
+    
+    // Clear any other selection on this string (only one note per string)
+    for (let fret = 0; fret <= 24; fret++) {
+      this.selectedPositions.delete(`${position.string}-${fret}`);
+    }
+    
+    // Add the new selection
+    this.selectedPositions.add(posKey);
+    
+    // Unmute the string if it was muted
+    if (this.mutedStrings.has(position.string)) {
       this.mutedStrings.delete(position.string);
     }
+    
     this.emitSelectionChange();
   }
 
   onStringDoubleClick(stringNum: number): void {
-    // Toggle mute for this string
+    // Toggle mute for this string (but preserve selected notes)
     if (this.mutedStrings.has(stringNum)) {
+      // Unmuting the string
       this.mutedStrings.delete(stringNum);
-    } else {
-      this.mutedStrings.add(stringNum);
-      // Clear any selections on this string
+      
+      // Check if this string has any selected note
+      let hasSelection = false;
       for (let fret = 0; fret <= 24; fret++) {
-        this.selectedPositions.delete(`${stringNum}-${fret}`);
+        if (this.selectedPositions.has(`${stringNum}-${fret}`)) {
+          hasSelection = true;
+          break;
+        }
       }
+      
+      // If no note selected, default to open string (fret 0)
+      if (!hasSelection) {
+        this.selectedPositions.add(`${stringNum}-0`);
+      }
+    } else {
+      // Muting the string - just set the mute flag
+      this.mutedStrings.add(stringNum);
+      // Don't clear selections - just mute the string
     }
     this.emitSelectionChange();
   }
@@ -165,18 +258,41 @@ export class FretboardComponent implements OnChanges {
   }
 
   private emitSelectionChange(): void {
-    const selectedPositionsList: FretboardPosition[] = [];
-
-    // Iterate through all strings and their positions to find selected ones
-    for (const stringData of this.strings) {
-      for (const position of stringData.positions) {
-        if (this.isPositionSelected(position)) {
-          selectedPositionsList.push(position);
-        }
+    const positions: FretboardPosition[] = [];
+    
+    // Only include positions that are NOT on muted strings
+    this.selectedPositions.forEach(posKey => {
+      const [stringNum, fret] = posKey.split('-').map(Number);
+      
+      // Skip if this string is muted
+      if (this.mutedStrings.has(stringNum)) {
+        return;
       }
-    }
-
-    this.selectionChange.emit(selectedPositionsList);
+      
+      // Try to find the position from the current strings array
+      const stringData = this.strings.find(s => s.string === stringNum);
+      let position: FretboardPosition | undefined;
+      
+      if (stringData) {
+        position = stringData.positions.find(p => p.fret === fret);
+      }
+      
+      // If not found (e.g., fret is outside visible range), reconstruct it
+      if (!position) {
+        const note = this.fretboardService.getNoteAtPosition(stringNum, fret);
+        position = {
+          string: stringNum,
+          fret: fret,
+          note: note,
+          isInChord: false, // We don't know if it's in chord when outside range, but that's ok for sheet music
+          isRoot: false
+        };
+      }
+      
+      positions.push(position);
+    });
+    
+    this.selectionChange.emit(positions);
   }
 
   getViewBoxWidth(): number {
@@ -187,5 +303,9 @@ export class FretboardComponent implements OnChanges {
   getViewBox(): string {
     const width = this.getViewBoxWidth();
     return `0 0 ${width} 180`;
+  }
+
+  toggleScaleDegrees(): void {
+    this.showScaleDegrees = !this.showScaleDegrees;
   }
 }

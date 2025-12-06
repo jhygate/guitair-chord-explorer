@@ -6,6 +6,12 @@
     </div>
     <div class="flex gap-2">
       <button
+        (click)="toggleScaleDegrees()"
+        class="px-2 py-1 bg-gray-200 hover:bg-gray-300 rounded text-xs font-medium"
+        title="Toggle between scale degrees and note names">
+        {{ showScaleDegrees ? 'Show Notes' : 'Show Degrees' }}
+      </button>
+      <button
         (click)="moveUp()"
         [disabled]="fretStart === 0"
         class="px-2 py-1 bg-gray-200 hover:bg-gray-300 disabled:bg-gray-100 disabled:text-gray-400 rounded text-xs font-medium">
@@ -62,9 +68,9 @@
                 [attr.y1]="30 + (i * 25)"
                 [attr.x2]="80 + (frets.length * 80)"
                 [attr.y2]="30 + (i * 25)"
-                [attr.stroke]="isStringMuted(stringData.string) ? '#ccc' : '#333'"
+                stroke="#333"
                 [attr.stroke-width]="1 + (6 - i) * 0.3"
-                [attr.opacity]="isStringMuted(stringData.string) ? '0.3' : '1'"/>
+                [attr.opacity]="isStringMuted(stringData.string) ? '0.5' : '1'"/>
 
           <!-- Mute/Play marker (X or O) on far left -->
           <g class="string-marker">
@@ -140,38 +146,66 @@
                         stroke="none"
                         class="note-dot clickable"
                         (click)="onPositionClick(position)"/>
+                <!-- Show scale degree or note name based on toggle -->
+                @if (showScaleDegrees && position.scaleDegree) {
+                  <text [attr.x]="120 + (fretIdx * 80)"
+                        [attr.y]="34 + (stringIdx * 25)"
+                        text-anchor="middle"
+                        font-size="8"
+                        fill="#333"
+                        opacity="0.6"
+                        font-weight="600"
+                        pointer-events="none">
+                    {{ position.scaleDegree }}
+                  </text>
+                } @else if (!showScaleDegrees) {
+                  <text [attr.x]="120 + (fretIdx * 80)"
+                        [attr.y]="34 + (stringIdx * 25)"
+                        text-anchor="middle"
+                        font-size="7"
+                        fill="#333"
+                        opacity="0.6"
+                        font-weight="600"
+                        pointer-events="none">
+                    {{ getNoteDisplay(position) }}
+                  </text>
+                }
               }
 
               <!-- Selected notes -->
-              @if (isPositionSelected(position) && !isStringMuted(stringData.string)) {
+              @if (isPositionSelected(position)) {
                 <g (click)="onPositionClick(position)" class="clickable">
                   <circle [attr.cx]="120 + (fretIdx * 80)"
                           [attr.cy]="30 + (stringIdx * 25)"
                           r="10"
                           [attr.fill]="position.isInChord ? '#2196f3' : '#f44336'"
                           stroke="#fff"
-                          stroke-width="2"/>
+                          stroke-width="2"
+                          [attr.opacity]="isStringMuted(stringData.string) ? '0.5' : '1'"/>
                   <text [attr.x]="120 + (fretIdx * 80)"
                         [attr.y]="34 + (stringIdx * 25)"
                         text-anchor="middle"
                         font-size="9"
                         fill="#fff"
                         font-weight="bold"
-                        pointer-events="none">
+                        pointer-events="none"
+                        [attr.opacity]="isStringMuted(stringData.string) ? '0.5' : '1'">
                     {{ getNoteDisplay(position) }}
                   </text>
                 </g>
               }
 
-              <!-- Clickable areas for empty positions -->
-              @if (!isPositionSelected(position) && !position.isInChord && !isStringMuted(stringData.string)) {
-                <circle [attr.cx]="120 + (fretIdx * 80)"
-                        [attr.cy]="30 + (stringIdx * 25)"
-                        r="8"
-                        fill="transparent"
-                        stroke="none"
-                        class="note-dot clickable empty-dot"
-                        (click)="onPositionClick(position)"/>
+              <!-- Clickable areas for all positions (large rectangles covering the fret area) -->
+              @if (!isPositionSelected(position) && !position.isInChord) {
+                <rect [attr.x]="80 + (fretIdx * 80)"
+                      [attr.y]="30 + (stringIdx * 25) - 12"
+                      width="80"
+                      height="24"
+                      fill="transparent"
+                      stroke="none"
+                      class="clickable"
+                      (click)="onPositionClick(position)"
+                      style="cursor: pointer;"/>
               }
             </g>
           }

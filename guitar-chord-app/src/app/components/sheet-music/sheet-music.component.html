@@ -4,12 +4,16 @@
   }
 
   <div class="sheet-music-wrapper">
-    <div #sheetMusicContainer class="sheet-music-canvas"></div>
-
-    @if (selectedPositions.length === 0) {
-      <div class="text-center text-gray-400 text-sm py-8">
-        Select notes on the fretboard to see sheet music
+    <div class="sheet-music-canvas">
+      <div class="flex justify-end mb-2">
+        <button
+          (click)="toggleKeySignature()"
+          class="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 rounded-md transition-colors"
+          title="Toggle key signature">
+          {{ showKeySignature ? 'Hide' : 'Show' }} Key Signature
+        </button>
       </div>
-    }
+      <div #sheetMusicContainer></div>
+    </div>
   </div>
 </div>

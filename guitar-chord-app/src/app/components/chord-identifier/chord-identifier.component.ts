@@ -1,4 +1,4 @@
-import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FretboardPosition } from '../../models';
 import { ChordIdentifierService, ChordMatch } from '../../services/chord-identifier.service';
@@ -12,6 +12,7 @@ import { ChordIdentifierService, ChordMatch } from '../../services/chord-identif
 })
 export class ChordIdentifierComponent implements OnChanges {
   @Input() selectedPositions: FretboardPosition[] = [];
+  @Output() chordSelected = new EventEmitter<ChordMatch | null>();
 
   chordMatches: ChordMatch[] = [];
   selectedMatch: ChordMatch | null = null;
@@ -43,7 +44,14 @@ export class ChordIdentifierComponent implements OnChanges {
   }
 
   onChordClick(match: ChordMatch): void {
-    this.selectedMatch = this.selectedMatch === match ? null : match;
+    // Toggle selection
+    if (this.selectedMatch === match) {
+      this.selectedMatch = null;
+      this.chordSelected.emit(null);
+    } else {
+      this.selectedMatch = match;
+      this.chordSelected.emit(match);
+    }
   }
 
   getConfidenceLabel(confidence: number): string {

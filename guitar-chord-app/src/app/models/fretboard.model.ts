@@ -6,6 +6,7 @@ export interface FretboardPosition {
   note: Note;
   isRoot: boolean;
   isInChord: boolean;
+  scaleDegree?: number; // 1-7 for scale degrees, or interval for chord tones
 }
 
 export interface ChordVoicing {

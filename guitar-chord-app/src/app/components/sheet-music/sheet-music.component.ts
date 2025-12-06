@@ -1,7 +1,7 @@
 import { Component, Input, OnChanges, SimpleChanges, ElementRef, ViewChild, AfterViewInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Renderer, Stave, StaveNote, Voice, Formatter, Accidental, StaveConnector } from 'vexflow';
-import { FretboardPosition } from '../../models';
+import { FretboardPosition, Note, ScaleType } from '../../models';
 
 @Component({
   selector: 'app-sheet-music',
@@ -13,8 +13,11 @@ import { FretboardPosition } from '../../models';
 export class SheetMusicComponent implements OnChanges, AfterViewInit {
   @Input() selectedPositions: FretboardPosition[] = [];
   @Input() chordName: string = '';
+  @Input() rootNote: Note | null = null;
+  @Input() scaleType: ScaleType | null = null;
   @ViewChild('sheetMusicContainer', { static: false }) container?: ElementRef;
 
+  showKeySignature = false;
   private renderer?: Renderer;
 
   ngAfterViewInit(): void {
@@ -22,8 +25,18 @@ export class SheetMusicComponent implements OnChanges, AfterViewInit {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
+    console.log('SheetMusicComponent ngOnChanges:', changes);
+    console.log('Current rootNote:', this.rootNote);
+    console.log('Current scaleType:', this.scaleType);
+    
     if (changes['selectedPositions'] && !changes['selectedPositions'].firstChange) {
       this.renderSheetMusic();
+    }
+    if (changes['rootNote'] || changes['scaleType']) {
+      console.log('Root note or scale type changed, re-rendering');
+      if (!changes['rootNote']?.firstChange || !changes['scaleType']?.firstChange) {
+        this.renderSheetMusic();
+      }
     }
   }
 
@@ -34,10 +47,6 @@ export class SheetMusicComponent implements OnChanges, AfterViewInit {
     const containerElement = this.container.nativeElement;
     containerElement.innerHTML = '';
 
-    if (this.selectedPositions.length === 0) {
-      return;
-    }
-
     try {
       // Create renderer - taller to accommodate both staves
       this.renderer = new Renderer(containerElement, Renderer.Backends.SVG);
@@ -47,11 +56,29 @@ export class SheetMusicComponent implements OnChanges, AfterViewInit {
       // Create treble clef stave (top)
       const trebleStave = new Stave(10, 20, 350);
       trebleStave.addClef('treble');
+      
+      // Add key signature if enabled
+      if (this.showKeySignature) {
+        const keySignature = this.getKeySignature();
+        if (keySignature) {
+          trebleStave.addKeySignature(keySignature);
+        }
+      }
+      
       trebleStave.setContext(context).draw();
 
       // Create bass clef stave (bottom)
       const bassStave = new Stave(10, 110, 350);
       bassStave.addClef('bass');
+      
+      // Add key signature if enabled
+      if (this.showKeySignature) {
+        const keySignature = this.getKeySignature();
+        if (keySignature) {
+          bassStave.addKeySignature(keySignature);
+        }
+      }
+      
       bassStave.setContext(context).draw();
 
       // Add brace connecting the staves
@@ -64,23 +91,26 @@ export class SheetMusicComponent implements OnChanges, AfterViewInit {
       lineConnector.setType('single');
       lineConnector.setContext(context).draw();
 
-      // Split notes between treble and bass clefs
-      const { trebleNotes, bassNotes } = this.convertPositionsToNotes();
+      // Only draw notes if we have positions selected
+      if (this.selectedPositions.length > 0) {
+        // Split notes between treble and bass clefs
+        const { trebleNotes, bassNotes } = this.convertPositionsToNotes();
 
-      // Draw treble clef notes
-      if (trebleNotes.length > 0) {
-        const trebleVoice = new Voice({ numBeats: 4, beatValue: 4 });
-        trebleVoice.addTickables(trebleNotes);
-        new Formatter().joinVoices([trebleVoice]).format([trebleVoice], 300);
-        trebleVoice.draw(context, trebleStave);
-      }
+        // Draw treble clef notes
+        if (trebleNotes.length > 0) {
+          const trebleVoice = new Voice({ numBeats: 4, beatValue: 4 });
+          trebleVoice.addTickables(trebleNotes);
+          new Formatter().joinVoices([trebleVoice]).format([trebleVoice], 300);
+          trebleVoice.draw(context, trebleStave);
+        }
 
-      // Draw bass clef notes
-      if (bassNotes.length > 0) {
-        const bassVoice = new Voice({ numBeats: 4, beatValue: 4 });
-        bassVoice.addTickables(bassNotes);
-        new Formatter().joinVoices([bassVoice]).format([bassVoice], 300);
-        bassVoice.draw(context, bassStave);
+        // Draw bass clef notes
+        if (bassNotes.length > 0) {
+          const bassVoice = new Voice({ numBeats: 4, beatValue: 4 });
+          bassVoice.addTickables(bassNotes);
+          new Formatter().joinVoices([bassVoice]).format([bassVoice], 300);
+          bassVoice.draw(context, bassStave);
+        }
       }
     } catch (error) {
       console.error('Error rendering sheet music:', error);
@@ -141,12 +171,11 @@ export class SheetMusicComponent implements OnChanges, AfterViewInit {
         clef: 'treble'
       });
 
-      // Add accidentals
+      // Add accidentals - only if not in key signature when key sig is shown
       treblePositions.forEach((pos, index) => {
-        if (pos.note.accidental === '#') {
-          trebleNote.addModifier(new Accidental('#'), index);
-        } else if (pos.note.accidental === 'b') {
-          trebleNote.addModifier(new Accidental('b'), index);
+        const accidentalToShow = this.shouldShowAccidental(pos.note);
+        if (accidentalToShow) {
+          trebleNote.addModifier(new Accidental(accidentalToShow), index);
         }
       });
 
@@ -168,12 +197,11 @@ export class SheetMusicComponent implements OnChanges, AfterViewInit {
         clef: 'bass'
       });
 
-      // Add accidentals
+      // Add accidentals - only if not in key signature when key sig is shown
       bassPositions.forEach((pos, index) => {
-        if (pos.note.accidental === '#') {
-          bassNote.addModifier(new Accidental('#'), index);
-        } else if (pos.note.accidental === 'b') {
-          bassNote.addModifier(new Accidental('b'), index);
+        const accidentalToShow = this.shouldShowAccidental(pos.note);
+        if (accidentalToShow) {
+          bassNote.addModifier(new Accidental(accidentalToShow), index);
         }
       });
 
@@ -181,5 +209,143 @@ export class SheetMusicComponent implements OnChanges, AfterViewInit {
     }
 
     return { trebleNotes, bassNotes };
+  }
+
+  toggleKeySignature(): void {
+    this.showKeySignature = !this.showKeySignature;
+    console.log('toggleKeySignature called, showKeySignature:', this.showKeySignature);
+    console.log('rootNote:', this.rootNote);
+    console.log('scaleType:', this.scaleType);
+    console.log('getKeySignature():', this.getKeySignature());
+    this.renderSheetMusic();
+  }
+
+  private getKeySignature(): string | null {
+    if (!this.rootNote || !this.scaleType) {
+      return null;
+    }
+
+    // Normalize the root note
+    const rootPitch = this.rootNote.pitch.includes('#') || this.rootNote.pitch.includes('b')
+      ? this.rootNote.pitch
+      : this.rootNote.pitch + (this.rootNote.accidental || '');
+
+    // Only implement for major and natural minor scales
+    if (this.scaleType === 'major') {
+      const majorKeys: { [key: string]: string } = {
+        'C': 'C',
+        'G': 'G',
+        'D': 'D',
+        'A': 'A',
+        'E': 'E',
+        'B': 'B',
+        'F#': 'F#',
+        'C#': 'C#',
+        'G#': 'Ab',  // Use enharmonic Ab instead of G#
+        'D#': 'Eb',  // Use enharmonic Eb instead of D#
+        'A#': 'Bb',  // Use enharmonic Bb instead of A#
+        'F': 'F',
+        'Bb': 'Bb',
+        'Eb': 'Eb',
+        'Ab': 'Ab',
+        'Db': 'Db',
+        'Gb': 'Gb'
+      };
+      return majorKeys[rootPitch] || null;
+    } else if (this.scaleType === 'natural_minor') {
+      // Convert minor key to its relative major for key signature
+      const minorToMajor: { [key: string]: string } = {
+        'A': 'C',
+        'E': 'G',
+        'B': 'D',
+        'F#': 'A',
+        'C#': 'E',
+        'G#': 'B',
+        'D#': 'F#',
+        'A#': 'C#',
+        'D': 'F',
+        'G': 'Bb',
+        'C': 'Eb',
+        'F': 'Ab',
+        'Bb': 'Db',
+        'Eb': 'Gb'
+      };
+      return minorToMajor[rootPitch] || null;
+    }
+    
+    return null;
+  }
+
+  /**
+   * Determine what accidental should be shown for a note
+   * Returns: '#', 'b', 'n' (natural), or null (no accidental needed)
+   * - When key signature is OFF: show actual sharp/flat
+   * - When key signature is ON: only show if different from key sig, use natural if needed
+   */
+  private shouldShowAccidental(note: Note): string | null {
+    const noteAccidental = note.pitch.includes('#') || note.pitch.includes('b')
+      ? (note.pitch.includes('#') ? '#' : 'b')
+      : note.accidental;
+
+    // If key signature is not shown, show the actual accidental
+    if (!this.showKeySignature) {
+      return noteAccidental === '#' || noteAccidental === 'b' ? noteAccidental : null;
+    }
+
+    // Get the key signature
+    const keySig = this.getKeySignature();
+    if (!keySig) {
+      return noteAccidental === '#' || noteAccidental === 'b' ? noteAccidental : null;
+    }
+
+    // Determine which notes are affected by the key signature
+    const keySignatureMap: { [key: string]: string[] } = {
+      'C': [],
+      'G': ['F'],      // F#
+      'D': ['F', 'C'],  // F#, C#
+      'A': ['F', 'C', 'G'],  // F#, C#, G#
+      'E': ['F', 'C', 'G', 'D'],  // F#, C#, G#, D#
+      'B': ['F', 'C', 'G', 'D', 'A'],  // F#, C#, G#, D#, A#
+      'F#': ['F', 'C', 'G', 'D', 'A', 'E'],  // All sharps
+      'C#': ['F', 'C', 'G', 'D', 'A', 'E', 'B'],  // All sharps
+      'F': ['B'],      // Bb
+      'Bb': ['B', 'E'],  // Bb, Eb
+      'Eb': ['B', 'E', 'A'],  // Bb, Eb, Ab
+      'Ab': ['B', 'E', 'A', 'D'],  // Bb, Eb, Ab, Db
+      'Db': ['B', 'E', 'A', 'D', 'G'],  // Bb, Eb, Ab, Db, Gb
+      'Gb': ['B', 'E', 'A', 'D', 'G', 'C']  // All flats
+    };
+
+    const affectedNotes = keySignatureMap[keySig] || [];
+    
+    // Get the base pitch (without accidental)
+    const basePitch = note.pitch.replace(/#|b/g, '');
+    
+    // If this note's base pitch is affected by the key signature
+    if (affectedNotes.includes(basePitch)) {
+      // Determine what accidental the key signature implies
+      const keyIsSharp = ['G', 'D', 'A', 'E', 'B', 'F#', 'C#'].includes(keySig);
+      const keyImpliesAccidental = keyIsSharp ? '#' : 'b';
+      
+      // If the note matches what the key signature says, don't show accidental
+      if (noteAccidental === keyImpliesAccidental) {
+        return null;
+      }
+      
+      // If the note is natural but key signature says it should be sharp/flat, show natural
+      if (!noteAccidental || noteAccidental === '') {
+        return 'n'; // Natural sign
+      }
+      
+      // Otherwise show the actual accidental (e.g., sharp in a flat key)
+      return noteAccidental;
+    }
+    
+    // If the note isn't affected by key signature, show accidental if present
+    if (noteAccidental === '#' || noteAccidental === 'b') {
+      return noteAccidental;
+    }
+    
+    return null;
   }
 }
