@@ -20,6 +20,7 @@
             "outputPath": "dist/guitar-chord-app",
             "index": "src/index.html",
             "browser": "src/main.ts",
+            "baseHref": "/guitar-chords/",
             "polyfills": [
               "zone.js"
             ],

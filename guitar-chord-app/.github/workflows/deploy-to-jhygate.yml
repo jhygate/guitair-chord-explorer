@@ -1,0 +1,55 @@
+name: Deploy to jhygate.github.io
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout guitar-chord-app
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      - name: Checkout jhygate.github.io deploy branch
+        uses: actions/checkout@v4
+        with:
+          repository: jhygate/jhygate.github.io
+          ref: deploy
+          token: ${{ secrets.JHYGATE_PAT }}
+          path: jhygate-deploy
+
+      - name: Update guitar-chords directory
+        run: |
+          # Remove old guitar-chords directory if it exists
+          rm -rf jhygate-deploy/guitar-chords
+          # Copy new build to guitar-chords directory
+          # Angular puts files in dist/guitar-chord-app/browser
+          cp -r dist/guitar-chord-app/browser jhygate-deploy/guitar-chords
+
+      - name: Commit and push to deploy branch
+        run: |
+          cd jhygate-deploy
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add guitar-chords
+          git commit -m "Deploy guitar-chord-app to /guitar-chords
+
+          🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+          Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>" || echo "No changes to commit"
+          git push
