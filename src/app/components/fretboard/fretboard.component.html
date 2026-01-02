@@ -35,18 +35,21 @@
 
       <!-- Fret lines (vertical) -->
       @for (fret of frets; track fret; let i = $index) {
-        <line [attr.x1]="80 + (i * 80)"
-              [attr.y1]="20"
-              [attr.x2]="80 + (i * 80)"
-              [attr.y2]="160"
-              stroke="#666"
-              stroke-width="2"/>
+        <!-- Skip drawing fret 0 - the nut represents it -->
+        @if (fret !== 0) {
+          <line [attr.x1]="fretStart === 0 ? (80 + (fret * 80)) : (80 + ((fret - fretStart + 1) * 80))"
+                [attr.y1]="20"
+                [attr.x2]="fretStart === 0 ? (80 + (fret * 80)) : (80 + ((fret - fretStart + 1) * 80))"
+                [attr.y2]="160"
+                stroke="#666"
+                stroke-width="2"/>
+        }
       }
 
       <!-- End fret line -->
-      <line [attr.x1]="80 + (frets.length * 80)"
+      <line [attr.x1]="fretStart === 0 ? (80 + (fretEnd * 80) + 80) : (80 + ((fretEnd - fretStart + 1) * 80) + 80)"
             y1="20"
-            [attr.x2]="80 + (frets.length * 80)"
+            [attr.x2]="fretStart === 0 ? (80 + (fretEnd * 80) + 80) : (80 + ((fretEnd - fretStart + 1) * 80) + 80)"
             y2="160"
             stroke="#666"
             stroke-width="3"/>
@@ -66,7 +69,7 @@
         <g>
           <line [attr.x1]="80"
                 [attr.y1]="30 + (i * 25)"
-                [attr.x2]="80 + (frets.length * 80)"
+                [attr.x2]="fretStart === 0 ? (80 + ((frets.length) * 80)) : (80 + ((frets.length + 1) * 80))"
                 [attr.y2]="30 + (i * 25)"
                 stroke="#333"
                 [attr.stroke-width]="1 + (6 - i) * 0.3"
@@ -122,91 +125,160 @@
 
       <!-- Fret numbers -->
       @for (fret of frets; track fret; let i = $index) {
-        <text [attr.x]="120 + (i * 80)"
-              y="15"
-              text-anchor="middle"
-              font-size="10"
-              fill="#666">
-          {{ fretStart + i === 0 ? '' : (fretStart + i) }}
-        </text>
+        @if (fret !== 0) {
+          <text [attr.x]="fretStart === 0 ? (40 + (fret * 80)) : (120 + ((fret - fretStart) * 80))"
+                y="15"
+                text-anchor="middle"
+                font-size="10"
+                fill="#666">
+            {{ fret }}
+          </text>
+        }
       }
 
-      <!-- Note dots/circles -->
+      <!-- Note interaction and rendering -->
       @for (stringData of strings; track stringData.string; let stringIdx = $index) {
         <g>
-          @for (position of stringData.positions; track position.fret; let fretIdx = $index) {
+          <!-- LAYER 1: Clickable hitboxes (drawn first, below everything) -->
+          @for (position of stringData.positions; track position.fret) {
+            @if (!isStringMuted(stringData.string)) {
+              @if (position.fret === 0) {
+                <!-- Open string: larger clickable area near the nut -->
+                <rect [attr.x]="60"
+                      [attr.y]="30 + (stringIdx * 25) - 15"
+                      width="40"
+                      height="30"
+                      fill="transparent"
+                      class="clickable"
+                      (click)="onPositionClick(position)"/>
+              } @else {
+                <!-- Fretted note: clickable area spanning the fret space -->
+                <rect [attr.x]="fretStart === 0 ? ((position.fret * 80)) : (80 + ((position.fret - fretStart) * 80))"
+                      [attr.y]="30 + (stringIdx * 25) - 15"
+                      width="80"
+                      height="30"
+                      fill="transparent"
+                      class="clickable"
+                      (click)="onPositionClick(position)"/>
+              }
+            }
+          }
+
+          <!-- LAYER 2: Visual representations (drawn on top of hitboxes) -->
+          @for (position of stringData.positions; track position.fret) {
             <g>
-              <!-- Ghost notes (unselected chord tones) -->
-              @if (!isPositionSelected(position) && position.isInChord && !isStringMuted(stringData.string)) {
-                <circle [attr.cx]="120 + (fretIdx * 80)"
-                        [attr.cy]="30 + (stringIdx * 25)"
-                        r="8"
-                        [attr.fill]="position.isRoot ? '#ffc107' : '#90caf9'"
-                        [attr.opacity]="0.4"
-                        stroke="none"
-                        class="note-dot clickable"
-                        (click)="onPositionClick(position)"/>
-                <!-- Show scale degree or note name based on toggle -->
-                @if (showScaleDegrees && position.scaleDegree) {
-                  <text [attr.x]="120 + (fretIdx * 80)"
+              <!-- SELECTED NOTES -->
+              @if (isPositionSelected(position)) {
+                @if (position.fret === 0) {
+                  <!-- Selected open string: ring style -->
+                  <circle [attr.cx]="80"
+                          [attr.cy]="30 + (stringIdx * 25)"
+                          r="11"
+                          fill="none"
+                          [attr.stroke]="position.isInChord ? '#2196f3' : '#f44336'"
+                          stroke-width="3"
+                          [attr.opacity]="isStringMuted(stringData.string) ? '0.5' : '1'"
+                          pointer-events="none"/>
+                  <text [attr.x]="80"
                         [attr.y]="34 + (stringIdx * 25)"
                         text-anchor="middle"
-                        font-size="8"
-                        fill="#333"
-                        opacity="0.6"
-                        font-weight="600"
-                        pointer-events="none">
-                    {{ position.scaleDegree }}
-                  </text>
-                } @else if (!showScaleDegrees) {
-                  <text [attr.x]="120 + (fretIdx * 80)"
-                        [attr.y]="34 + (stringIdx * 25)"
-                        text-anchor="middle"
-                        font-size="7"
-                        fill="#333"
-                        opacity="0.6"
-                        font-weight="600"
+                        font-size="9"
+                        [attr.fill]="position.isInChord ? '#2196f3' : '#f44336'"
+                        font-weight="bold"
+                        [attr.opacity]="isStringMuted(stringData.string) ? '0.5' : '1'"
                         pointer-events="none">
                     {{ getNoteDisplay(position) }}
                   </text>
-                }
-              }
-
-              <!-- Selected notes -->
-              @if (isPositionSelected(position)) {
-                <g (click)="onPositionClick(position)" class="clickable">
-                  <circle [attr.cx]="120 + (fretIdx * 80)"
+                } @else {
+                  <!-- Selected fretted note: filled circle -->
+                  <circle [attr.cx]="fretStart === 0 ? (40 + (position.fret * 80)) : (120 + ((position.fret - fretStart) * 80))"
                           [attr.cy]="30 + (stringIdx * 25)"
                           r="10"
                           [attr.fill]="position.isInChord ? '#2196f3' : '#f44336'"
                           stroke="#fff"
                           stroke-width="2"
-                          [attr.opacity]="isStringMuted(stringData.string) ? '0.5' : '1'"/>
-                  <text [attr.x]="120 + (fretIdx * 80)"
+                          [attr.opacity]="isStringMuted(stringData.string) ? '0.5' : '1'"
+                          pointer-events="none"/>
+                  <text [attr.x]="fretStart === 0 ? (40 + (position.fret * 80)) : (120 + ((position.fret - fretStart) * 80))"
                         [attr.y]="34 + (stringIdx * 25)"
                         text-anchor="middle"
                         font-size="9"
                         fill="#fff"
                         font-weight="bold"
-                        pointer-events="none"
-                        [attr.opacity]="isStringMuted(stringData.string) ? '0.5' : '1'">
+                        [attr.opacity]="isStringMuted(stringData.string) ? '0.5' : '1'"
+                        pointer-events="none">
                     {{ getNoteDisplay(position) }}
                   </text>
-                </g>
+                }
+              } @else if (position.isInChord && !isStringMuted(stringData.string)) {
+                <!-- GHOST NOTES (unselected chord tones) -->
+                @if (position.fret === 0) {
+                  <!-- Ghost open string: thin ring -->
+                  <circle [attr.cx]="80"
+                          [attr.cy]="30 + (stringIdx * 25)"
+                          r="9"
+                          fill="none"
+                          [attr.stroke]="position.isRoot ? '#ffc107' : '#90caf9'"
+                          stroke-width="2.5"
+                          opacity="0.5"
+                          pointer-events="none"/>
+                  @if (showScaleDegrees && position.scaleDegree) {
+                    <text [attr.x]="80"
+                          [attr.y]="34 + (stringIdx * 25)"
+                          text-anchor="middle"
+                          font-size="8"
+                          [attr.fill]="position.isRoot ? '#ffc107' : '#90caf9'"
+                          opacity="0.6"
+                          font-weight="600"
+                          pointer-events="none">
+                      {{ position.scaleDegree }}
+                    </text>
+                  } @else if (!showScaleDegrees) {
+                    <text [attr.x]="80"
+                          [attr.y]="34 + (stringIdx * 25)"
+                          text-anchor="middle"
+                          font-size="7"
+                          [attr.fill]="position.isRoot ? '#ffc107' : '#90caf9'"
+                          opacity="0.6"
+                          font-weight="600"
+                          pointer-events="none">
+                      {{ getNoteDisplay(position) }}
+                    </text>
+                  }
+                } @else {
+                  <!-- Ghost fretted note: semi-transparent filled circle -->
+                  <circle [attr.cx]="fretStart === 0 ? (40 + (position.fret * 80)) : (120 + ((position.fret - fretStart) * 80))"
+                          [attr.cy]="30 + (stringIdx * 25)"
+                          r="8"
+                          [attr.fill]="position.isRoot ? '#ffc107' : '#90caf9'"
+                          opacity="0.4"
+                          pointer-events="none"/>
+                  @if (showScaleDegrees && position.scaleDegree) {
+                    <text [attr.x]="fretStart === 0 ? (40 + (position.fret * 80)) : (120 + ((position.fret - fretStart) * 80))"
+                          [attr.y]="34 + (stringIdx * 25)"
+                          text-anchor="middle"
+                          font-size="8"
+                          fill="#333"
+                          opacity="0.6"
+                          font-weight="600"
+                          pointer-events="none">
+                      {{ position.scaleDegree }}
+                    </text>
+                  } @else if (!showScaleDegrees) {
+                    <text [attr.x]="fretStart === 0 ? (40 + (position.fret * 80)) : (120 + ((position.fret - fretStart) * 80))"
+                          [attr.y]="34 + (stringIdx * 25)"
+                          text-anchor="middle"
+                          font-size="7"
+                          fill="#333"
+                          opacity="0.6"
+                          font-weight="600"
+                          pointer-events="none">
+                      {{ getNoteDisplay(position) }}
+                    </text>
+                  }
+                }
               }
-
-              <!-- Clickable areas for all positions (large rectangles covering the fret area) -->
-              @if (!isPositionSelected(position) && !position.isInChord) {
-                <rect [attr.x]="80 + (fretIdx * 80)"
-                      [attr.y]="30 + (stringIdx * 25) - 12"
-                      width="80"
-                      height="24"
-                      fill="transparent"
-                      stroke="none"
-                      class="clickable"
-                      (click)="onPositionClick(position)"
-                      style="cursor: pointer;"/>
-              }
+              <!-- EMPTY POSITIONS: no visual needed, hitbox handles clicks -->
             </g>
           }
         </g>

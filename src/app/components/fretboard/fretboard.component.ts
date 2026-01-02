@@ -297,7 +297,9 @@ export class FretboardComponent implements OnChanges {
 
   getViewBoxWidth(): number {
     // Base width: 80px offset + (number of frets * 80px spacing) + 20px padding
-    return 80 + (this.frets.length * 80) + 20;
+    // When fretStart === 0, we don't count fret 0 as taking up space (just the nut)
+    const fretCount = this.fretStart === 0 ? this.frets.length : this.frets.length + 1;
+    return 80 + (fretCount * 80) + 20;
   }
 
   getViewBox(): string {
